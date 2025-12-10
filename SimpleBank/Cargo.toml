@@ -1,5 +1,5 @@
 [package]
-name = "SimpleBank"
+name = "simple_bank"
 version = "0.1.0"
 edition = "2021"
 

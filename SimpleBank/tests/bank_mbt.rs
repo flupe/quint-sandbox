@@ -5,7 +5,7 @@ pub mod tests {
     use num_bigint::BigInt;
     use serde::Deserialize;
     use std::fs;
-    use SimpleBank::bank::*;
+    use simple_bank::bank::*;
 
     #[derive(Clone, Debug, Deserialize)]
     pub struct NondetPicks {
@@ -87,7 +87,7 @@ pub mod tests {
                         let amount = nondet_picks.amount.clone().unwrap();
                         println!("deposit({}, {})", depositor, amount);
 
-                        let res = deposit(&mut bank_state, depositor, amount);
+                        let res = bank_state.deposit(depositor, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "withdraw_action" => {
@@ -95,7 +95,7 @@ pub mod tests {
                         let amount = nondet_picks.amount.clone().unwrap();
                         println!("withdraw({}, {})", withdrawer, amount);
 
-                        let res = withdraw(&mut bank_state, withdrawer, amount);
+                        let res = bank_state.withdraw(withdrawer, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "transfer_action" => {
@@ -104,7 +104,7 @@ pub mod tests {
                         let amount = nondet_picks.amount.clone().unwrap();
                         println!("transfer({}, {}, {})", sender, receiver, amount);
 
-                        let res = transfer(&mut bank_state, sender, receiver, amount);
+                        let res = bank_state.transfer(sender, receiver, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "buy_investment_action" => {
@@ -112,7 +112,7 @@ pub mod tests {
                         let amount = nondet_picks.amount.clone().unwrap();
                         println!("buy_investment({}, {})", buyer, amount);
 
-                        let res = buy_investment(&mut bank_state, buyer, amount);
+                        let res = bank_state.buy_investment(buyer, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "sell_investment_action" => {
@@ -120,7 +120,7 @@ pub mod tests {
                         let id = nondet_picks.id.clone().unwrap();
                         println!("sell_investment({}, {})", seller, id);
 
-                        let res = sell_investment(&mut bank_state, seller, id);
+                        let res = bank_state.sell_investment(seller, id);
                         compare_error(state.value.error.clone(), res)
                     }
                     action => panic!("Invalid action taken {}", action),
