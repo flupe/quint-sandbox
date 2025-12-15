@@ -2,12 +2,12 @@
 #![allow(unused_variables)]
 
 use num_bigint::BigInt;
-use serde::{Deserialize};
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 pub type ErrorMsg = String;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Investment {
     pub owner: String,
     pub amount: BigInt,
@@ -17,7 +17,7 @@ pub struct Investment {
 //  currently, the state is an exact copy of the Quint state (or the converse)
 //  we could imagine having a different representation for the Rust state
 //  and an equivalence relation instead.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BankState {
     pub balances: HashMap<String, BigInt>,
     pub investments: HashMap<BigInt, Investment>,

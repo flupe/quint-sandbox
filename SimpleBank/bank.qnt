@@ -12,6 +12,7 @@ module bank {
   type BankResult = Ok(BankState) | Err(str)
 
   var bank_state: BankState
+  var log: List[BankState]
   var error: Option[str]
 
   pure def deposit(bank_state: BankState, depositor: str, amount: int): BankResult = {
@@ -99,10 +100,12 @@ module bank {
     | Ok(state) => all {
         bank_state' = state,
         error' = None,
+        log' = log.append(state),
       }
     | Err(err) => all {
         bank_state' = bank_state,
         error' = Some(err),
+        log' = log,
       }
   }
 
@@ -142,13 +145,17 @@ module bank {
     assign_result(r)
   }
 
-  action init = all {
-    bank_state' = {
+  action init = {
+    val initState = {
       balances: ACCOUNTS.mapBy(acc => 0),
       investments: Map(),
-      next_id: 0
-    },
-    error' = None,
+      next_id: 0,
+    }
+    all {
+      bank_state' = initState,
+      error' = None,
+      log' = [initState],
+    }
   }
 
   action step = any {
