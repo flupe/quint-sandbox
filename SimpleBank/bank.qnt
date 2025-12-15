@@ -107,38 +107,38 @@ module bank {
   }
 
   action deposit_action = {
-    nondet amount = AMOUNTS.oneOf()
+    nondet amount    = AMOUNTS.oneOf()
     nondet depositor = ACCOUNTS.oneOf()
-    val r = deposit(bank_state, depositor, amount)
+    val r = bank_state.deposit(depositor, amount)
     assign_result(r)
   }
 
   action withdraw_action = {
-    nondet amount = AMOUNTS.oneOf()
+    nondet amount     = AMOUNTS.oneOf()
     nondet withdrawer = ACCOUNTS.oneOf()
-    val r = withdraw(bank_state, withdrawer, amount)
+    val r = bank_state.withdraw(withdrawer, amount)
     assign_result(r)
   }
 
   action transfer_action = {
-    nondet amount = AMOUNTS.oneOf()
-    nondet sender = ACCOUNTS.oneOf()
+    nondet amount   = AMOUNTS.oneOf()
+    nondet sender   = ACCOUNTS.oneOf()
     nondet receiver = ACCOUNTS.oneOf()
-    val r = transfer(bank_state, sender, receiver, amount)
+    val r = bank_state.transfer(sender, receiver, amount)
     assign_result(r)
   }
 
   action buy_investment_action = {
     nondet amount = AMOUNTS.oneOf()
     nondet buyer = ACCOUNTS.oneOf()
-    val r = buy_investment(bank_state, buyer, amount)
+    val r = bank_state.buy_investment(buyer, amount)
     assign_result(r)
   }
 
   action sell_investment_action = {
     nondet id = 0.to(10).oneOf()
     nondet seller = ACCOUNTS.oneOf()
-    val r = sell_investment(bank_state, seller, id)
+    val r = bank_state.sell_investment(seller, id)
     assign_result(r)
   }
 

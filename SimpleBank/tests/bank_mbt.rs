@@ -76,53 +76,53 @@ pub mod tests {
 
             for state in trace.states {
                 let action_taken = state.value.action_taken;
-                let nondet_picks = state.value.nondet_picks;
+                let picks = state.value.nondet_picks;
 
                 match action_taken.as_str() {
-                    "init" => {
-                        println!("initializing");
-                    }
+                    "init" => { println!("initializing"); }
+
                     "deposit_action" => {
-                        let depositor = nondet_picks.depositor.clone().unwrap();
-                        let amount = nondet_picks.amount.clone().unwrap();
+                        let depositor = picks.depositor.clone().unwrap();
+                        let amount    = picks.amount.clone().unwrap();
                         println!("deposit({}, {})", depositor, amount);
 
                         let res = bank_state.deposit(depositor, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "withdraw_action" => {
-                        let withdrawer = nondet_picks.withdrawer.clone().unwrap();
-                        let amount = nondet_picks.amount.clone().unwrap();
+                        let withdrawer = picks.withdrawer.clone().unwrap();
+                        let amount     = picks.amount.clone().unwrap();
                         println!("withdraw({}, {})", withdrawer, amount);
 
                         let res = bank_state.withdraw(withdrawer, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "transfer_action" => {
-                        let sender = nondet_picks.sender.clone().unwrap();
-                        let receiver = nondet_picks.receiver.clone().unwrap();
-                        let amount = nondet_picks.amount.clone().unwrap();
+                        let sender   = picks.sender.clone().unwrap();
+                        let receiver = picks.receiver.clone().unwrap();
+                        let amount   = picks.amount.clone().unwrap();
                         println!("transfer({}, {}, {})", sender, receiver, amount);
 
                         let res = bank_state.transfer(sender, receiver, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "buy_investment_action" => {
-                        let buyer = nondet_picks.buyer.clone().unwrap();
-                        let amount = nondet_picks.amount.clone().unwrap();
+                        let buyer  = picks.buyer.clone().unwrap();
+                        let amount = picks.amount.clone().unwrap();
                         println!("buy_investment({}, {})", buyer, amount);
 
                         let res = bank_state.buy_investment(buyer, amount);
                         compare_error(state.value.error.clone(), res)
                     }
                     "sell_investment_action" => {
-                        let seller = nondet_picks.seller.clone().unwrap();
-                        let id = nondet_picks.id.clone().unwrap();
+                        let seller = picks.seller.clone().unwrap();
+                        let id     = picks.id.clone().unwrap();
                         println!("sell_investment({}, {})", seller, id);
 
                         let res = bank_state.sell_investment(seller, id);
                         compare_error(state.value.error.clone(), res)
                     }
+
                     action => panic!("Invalid action taken {}", action),
                 }
             }

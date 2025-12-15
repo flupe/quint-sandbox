@@ -1,6 +1,11 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use num_bigint::BigInt;
-use serde::Deserialize;
+use serde::{Deserialize};
 use std::collections::HashMap;
+
+pub type ErrorMsg = String;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Investment {
@@ -8,6 +13,10 @@ pub struct Investment {
     pub amount: BigInt,
 }
 
+// NOTE(flupe):
+//  currently, the state is an exact copy of the Quint state (or the converse)
+//  we could imagine having a different representation for the Rust state
+//  and an equivalence relation instead.
 #[derive(Clone, Debug, Deserialize)]
 pub struct BankState {
     pub balances: HashMap<String, BigInt>,
@@ -15,44 +24,57 @@ pub struct BankState {
     pub next_id: BigInt,
 }
 
+
 impl BankState {
-    pub fn deposit(&mut self, depositor: String, amount: BigInt) -> Option<String> {
-        if amount <= BigInt::from(0) {
-            return Some("Amount should be greater than zero".to_string());
+    pub fn new() -> Self {
+        BankState {
+            balances:    HashMap::new(),
+            investments: HashMap::new(),
+            next_id:     BigInt::from(0),
         }
-
-        self
-            .balances
-            .entry(depositor)
-            .and_modify(|curr| *curr += amount);
-
-        None
     }
 
-    pub fn withdraw(&mut self, withdrawer: String, amount: BigInt) -> Option<String> {
+    pub fn deposit(&mut self, depositor: String, amount: BigInt) -> Result<(), ErrorMsg> {
         if amount <= BigInt::from(0) {
-            return Some("Amount should be greater than zero".to_string());
+            return Err("Amount should be greater than zero".to_string());
         }
 
-        if self.balances.get(&withdrawer).unwrap() < &amount {
-            return Some("Balance is too low".to_string());
+        self.balances.entry(depositor)
+            .and_modify(|curr| *curr += amount.clone())
+            .or_insert(amount);
+
+        Ok(())
+    }
+
+    pub fn withdraw(&mut self, withdrawer: String, amount: BigInt) -> Result<(), ErrorMsg> {
+        if amount <= BigInt::from(0) {
+            return Err("Amount should be greater than zero".to_string());
         }
 
-        self
-            .balances
+        let balance = self.balances.get(&withdrawer)
+                          .ok_or(format!("Could not find withdrawer {}", withdrawer))?;
+
+        if balance < &amount {
+            return Err("Balance is too low".to_string());
+        }
+
+        self.balances
             .entry(withdrawer)
             .and_modify(|curr| *curr -= amount);
 
-        None
+        Ok(())
     }
 
-    pub fn transfer(&mut self, sender: String, receiver: String, amount: BigInt) -> Option<String> {
+    pub fn transfer(&mut self, sender: String, receiver: String, amount: BigInt) -> Result<(), ErrorMsg> {
         if amount <= BigInt::from(0) {
-            return Some("Amount should be greater than zero".to_string());
+            return Err("Amount should be greater than zero".to_string());
         }
 
-        if self.balances.get(&sender).unwrap() < &amount {
-            return Some("Balance is too low".to_string());
+        let balance = self.balances.get(&sender)
+                          .ok_or(format!("Could not find sender {}", sender))?;
+
+        if balance < &amount {
+            return Err("Balance is too low".to_string());
         }
 
         self
@@ -63,18 +85,22 @@ impl BankState {
         self
             .balances
             .entry(receiver)
-            .and_modify(|curr| *curr += amount);
+            .and_modify(|curr| *curr += amount.clone())
+            .or_insert(amount);
 
-        None
+        Ok(())
     }
 
-    pub fn buy_investment(&mut self, buyer: String, amount: BigInt) -> Option<String> {
+    pub fn buy_investment(&mut self, buyer: String, amount: BigInt) -> Result<(), ErrorMsg> {
         if amount <= BigInt::from(0) {
-            return Some("Amount should be greater than zero".to_string());
+            return Err("Amount should be greater than zero".to_string());
         }
 
-        if self.balances.get(&buyer).unwrap() < &amount {
-            return Some("Balance is too low".to_string());
+        let balance = self.balances.get(&buyer)
+                          .ok_or(format!("Could not find buyer {}", buyer))?;
+
+        if balance < &amount {
+            return Err("Balance is too low".to_string());
         }
 
         self
@@ -92,13 +118,13 @@ impl BankState {
 
         self.next_id += 1;
 
-        None
+        Ok(())
     }
 
-    pub fn sell_investment(&mut self, seller: String, investment_id: BigInt) -> Option<String> {
+    pub fn sell_investment(&mut self, seller: String, investment_id: BigInt) -> Result<(), ErrorMsg> {
         if let Some(investment) = self.investments.get(&investment_id) {
             if investment.owner != seller {
-                return Some("Seller can't sell an investment they don't own".to_string());
+                return Err("Seller can't sell an investment they don't own".to_string());
             }
             self
                 .balances
@@ -107,15 +133,11 @@ impl BankState {
 
             self.investments.remove(&investment_id);
 
-            None
+            Ok(())
         }
         else {
-            Some("No investment with this id".to_string())
+            Err("No investment with this id".to_string())
         }
     }
+
 }
-
-
-
-
-
