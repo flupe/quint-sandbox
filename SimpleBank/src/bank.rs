@@ -1,15 +1,21 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use serde_with_macros::serde_as;
+use serde_with::DisplayFromStr;
 use num_bigint::BigInt;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+// use itf::value::{Value, Map};
+// use itf::value::BigInt as ITFBigInt;
 
 pub type ErrorMsg = String;
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Investment {
     pub owner: String,
+    #[serde_as(serialize_as = "DisplayFromStr")]
     pub amount: BigInt,
 }
 
@@ -17,10 +23,14 @@ pub struct Investment {
 //  currently, the state is an exact copy of the Quint state (or the converse)
 //  we could imagine having a different representation for the Rust state
 //  and an equivalence relation instead.
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BankState {
+    #[serde_as(serialize_as = "HashMap<_, DisplayFromStr>")]
     pub balances: HashMap<String, BigInt>,
+    #[serde_as(serialize_as = "HashMap<DisplayFromStr, _>")]
     pub investments: HashMap<BigInt, Investment>,
+    #[serde_as(serialize_as = "DisplayFromStr")]
     pub next_id: BigInt,
 }
 
