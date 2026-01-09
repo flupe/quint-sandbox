@@ -15,13 +15,21 @@ module bank {
   var log: List[BankState]
   var error: Option[str]
 
+  pure def increaseBalance(bs: str -> int, key: str, amount: int): str -> int =
+    if (bs.keys().contains(key)) {
+      bs.setBy(key, current => current + amount)
+    }
+    else {
+      bs.put(key, amount)
+    }
+
   pure def deposit(bank_state: BankState, depositor: str, amount: int): BankResult = {
     if (amount <= 0) {
       Err("Amount should be greater than zero")
     } else {
       val new_bank_state = {
         ...bank_state,
-        balances: bank_state.balances.setBy(depositor, current => current + amount)
+        balances: bank_state.balances.increaseBalance(depositor, amount)
       }
       Ok(new_bank_state)
     }
@@ -30,7 +38,10 @@ module bank {
   pure def withdraw(bank_state: BankState, withdrawer: str, amount: int): BankResult = {
     if (amount <= 0) {
       Err("Amount should be greater than zero")
-    } else if (bank_state.balances.get(withdrawer) < amount) {
+    } else if (not(bank_state.balances.keys().contains(withdrawer))) {
+      Err("Withdrawer does not have an account")
+    }
+    else if (bank_state.balances.get(withdrawer) < amount) {
       Err("Balance is too low")
     } else {
       val new_bank_state = {
@@ -45,6 +56,8 @@ module bank {
   pure def transfer(bank_state: BankState, sender: str, receiver: str, amount: int): BankResult = {
     if (amount <= 0) {
       Err("Amount should be greater than zero")
+    } else if (not(bank_state.balances.keys().contains(sender))) {
+      Err("Sender does not have an account")
     } else if (bank_state.balances.get(sender) < amount) {
       Err("Balance is too low")
     } else {
@@ -52,7 +65,7 @@ module bank {
         ...bank_state,
         balances: bank_state.balances
           .setBy(sender, current => current - amount)
-          .setBy(receiver, current => current + amount)
+          .increaseBalance(receiver, amount)
       }
       Ok(new_bank_state)
     }
@@ -61,6 +74,8 @@ module bank {
   pure def buy_investment(bank_state: BankState, buyer: str, amount: int): BankResult = {
     if (amount <= 0) {
       Err("Amount should be greater than zero")
+    } else if (not(bank_state.balances.keys().contains(buyer))) {
+      Err("Buyer does not have an account")
     } else if (bank_state.balances.get(buyer) < amount) {
       Err("Balance is too low")
     } else {
@@ -93,7 +108,7 @@ module bank {
     }
   }
 
-  val ACCOUNTS = Set("Alice", "Bob", "Charlie")
+  val ACCOUNTS = Set("alice", "bob")
   val AMOUNTS = (-50).to(100)
 
   action assign_result(r: BankResult): bool = match r {
@@ -109,45 +124,53 @@ module bank {
       }
   }
 
+  action deposit_act(depositor: str, amount: int): bool =
+    assign_result(bank_state.deposit(depositor, amount))
+  action withdraw_act(withdrawer: str, amount: int): bool =
+    assign_result(bank_state.withdraw(withdrawer, amount))
+  action transfer_act(sender: str, receiver: str, amount: int): bool =
+    assign_result(bank_state.transfer(sender, receiver, amount))
+  action buy_investment_act(buyer: str, amount: int): bool =
+    assign_result(bank_state.buy_investment(buyer, amount))
+  action sell_investment_act(seller: str, id: int): bool =
+    assign_result(bank_state.sell_investment(seller, id))
+
+  // TODO: cleanup step function and non-det picks
   action deposit_action = {
     nondet amount    = AMOUNTS.oneOf()
     nondet depositor = ACCOUNTS.oneOf()
-    val r = bank_state.deposit(depositor, amount)
-    assign_result(r)
+    deposit_act(depositor, amount)
   }
 
   action withdraw_action = {
     nondet amount     = AMOUNTS.oneOf()
     nondet withdrawer = ACCOUNTS.oneOf()
-    val r = bank_state.withdraw(withdrawer, amount)
-    assign_result(r)
+    withdraw_act(withdrawer, amount)
   }
 
   action transfer_action = {
     nondet amount   = AMOUNTS.oneOf()
     nondet sender   = ACCOUNTS.oneOf()
     nondet receiver = ACCOUNTS.oneOf()
-    val r = bank_state.transfer(sender, receiver, amount)
-    assign_result(r)
+    transfer_act(sender, receiver, amount)
   }
 
   action buy_investment_action = {
     nondet amount = AMOUNTS.oneOf()
     nondet buyer = ACCOUNTS.oneOf()
-    val r = bank_state.buy_investment(buyer, amount)
-    assign_result(r)
+    buy_investment_act(buyer, amount)
   }
 
   action sell_investment_action = {
     nondet id = 0.to(10).oneOf()
     nondet seller = ACCOUNTS.oneOf()
-    val r = bank_state.sell_investment(seller, id)
-    assign_result(r)
+    sell_investment_act(seller, id)
   }
 
   action init = {
     val initState = {
-      balances: ACCOUNTS.mapBy(acc => 0),
+      // balances: ACCOUNTS.mapBy(acc => 0),
+      balances: Map(),
       investments: Map(),
       next_id: 0,
     }

@@ -9,6 +9,7 @@ use rustyline::{DefaultEditor};
 use serde_json::{to_string};
 use clap::Parser;
 
+mod helpers;
 mod bank;
 mod action;
 

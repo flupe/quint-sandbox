@@ -5,15 +5,40 @@ use num_bigint::BigInt;
 use std::str::FromStr;
 use std::str::{SplitWhitespace};
 use serde::{Serialize};
+use serde_with_macros::serde_as;
 
+use crate::helpers::ItfBigInt;
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize)]
+#[serde(tag = "tag", content = "value")]
 pub enum Action {
-    Deposit        { depositor: String, amount: BigInt },
-    Withdraw       { withdrawer: String, amount: BigInt },
-    Transfer       { sender: String, receiver: String, amount: BigInt },
-    BuyInvestment  { buyer: String, amount: BigInt },
-    SellInvestment { seller: String, investment_id: BigInt },
+    Deposit {
+        depositor: String,
+        #[serde_as(serialize_as = "ItfBigInt")]
+        amount: BigInt
+    },
+    Withdraw {
+        withdrawer: String,
+        #[serde_as(serialize_as = "ItfBigInt")]
+        amount: BigInt
+    },
+    Transfer {
+        sender: String,
+        receiver: String,
+        #[serde_as(serialize_as = "ItfBigInt")]
+        amount: BigInt
+    },
+    BuyInvestment {
+        buyer: String,
+        #[serde_as(serialize_as = "ItfBigInt")]
+        amount: BigInt
+    },
+    SellInvestment {
+        seller: String,
+        #[serde_as(serialize_as = "ItfBigInt")]
+        investment_id: BigInt
+    },
 }
 
 // parsing helpers

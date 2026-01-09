@@ -2,20 +2,19 @@
 #![allow(unused_variables)]
 
 use serde_with_macros::serde_as;
-use serde_with::DisplayFromStr;
 use num_bigint::BigInt;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-// use itf::value::{Value, Map};
-// use itf::value::BigInt as ITFBigInt;
 
 pub type ErrorMsg = String;
+
+use crate::helpers::{ItfMap, ItfBigInt};
 
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Investment {
     pub owner: String,
-    #[serde_as(serialize_as = "DisplayFromStr")]
+    #[serde_as(serialize_as = "ItfBigInt")]
     pub amount: BigInt,
 }
 
@@ -26,11 +25,11 @@ pub struct Investment {
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BankState {
-    #[serde_as(serialize_as = "HashMap<_, DisplayFromStr>")]
+    #[serde_as(serialize_as = "ItfMap<_, ItfBigInt>")]
     pub balances: HashMap<String, BigInt>,
-    #[serde_as(serialize_as = "HashMap<DisplayFromStr, _>")]
+    #[serde_as(serialize_as = "ItfMap<ItfBigInt, _>")]
     pub investments: HashMap<BigInt, Investment>,
-    #[serde_as(serialize_as = "DisplayFromStr")]
+    #[serde_as(serialize_as = "ItfBigInt")]
     pub next_id: BigInt,
 }
 

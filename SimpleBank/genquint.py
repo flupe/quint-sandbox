@@ -3,58 +3,125 @@
 import json
 import functools
 import operator
-from jinja2 import Environment, FileSystemLoader
+import argparse
 
-with open('log') as f:
-    data = [json.loads(line) for line in f]
+from collections import namedtuple
+from itf_py      import value_from_json
 
-# bigint cleanup
-# ==============
-# This step is necessary because currently itf-rs doesn't provide nice helpers for generating traces
-# Once the itf-rs library provides proper serializers, this could be skipped
+action_lookup = {
+  'Deposit':        'deposit_act',
+  'Transfer':       'transfer_act',
+  'Withdraw':       'withdraw_act',
+  'BuyInvestment':  'buy_investment_act',
+  'SellInvestment': 'sell_investment_act',
+}
 
-for st in data:
-    st['balances'] = {'tag': '#map', 'value': [(user, int(balance)) for (user, balance) in st['balances'].items()]}
-    st['next_id']   = int(st['next_id'])
+# Load a log file, parsing every line as an ITF-encoded value
+def load_values(src):
+    with open(src) as f:
+        return [value_from_json(json.loads(line)) for line in f]
 
-    invests = []
-    for (k, v) in st['investments'].items():
-        v['amount'] = int(v['amount'])
-        invests.append((int(k), v))
-    st['investments'] = {
-        'tag': "#map",
-        'value': invests
-    }
+def to_quint_action(a):
+    if a in action_lookup.keys():
+        return action_lookup[a]
+    else:
+        return a
 
-
-# Pretty-print a Python value into a Quint expression
+# Pretty-print a Python ITF value into a Quint expression
 def quintify(value):
+    # simple dicts become Quint Maps
     if isinstance(value, dict):
-        if 'tag' in value and value['tag'] == '#map':
-            pairs = ["{} -> {}".format(quintify(k), quintify(v)) for (k, v) in value['value']]
-            return "Map({})".format(", ".join(pairs))
-        else:
-            pairs = ["{}: {}".format(k, quintify(v)) for (k, v) in sorted(value.items())]
-            return "{{{}}}".format(", ".join(pairs))
+        items = ['{} -> {}'.format(quintify(k), quintify(v)) for k, v in value.items()]
+        return 'Map({})'.format(', '.join(items))
+    # strings have to use double quotes
     elif isinstance(value, str):
         res = repr(value)
         if res.startswith("'"): # ensure double-quotes are used
             inner = res[1:-1].replace('"', '\\"').replace("\\'", "'")
             return '"{}"'.format(inner)
         return res
+    # booleans are lowercase
     elif isinstance(value, bool):
         return str(value).lower()
+    # lists syntax is identical
+    elif isinstance(value, list):
+        items = map(quintify, value)
+        return "[{}]".format(", ".join(items))
+    # named tuples become Quint records
+    elif isinstance(value, tuple) and hasattr(value, "_fields"):
+        # TODO: possibly handle _itf_variant
+        fields = value._asdict()
+        items = ['{}: {}'.format(k, quintify(v)) for k, v in fields.items()]
+        return '{{{}}}'.format(', '.join(items))
     else:
         return repr(value)
 
-# Jinja2 environment, that:
-# - looks up templates in the templates/ folder
-# - adds a filter to pretty-print into Quint values
-jenv = Environment(
-    loader=FileSystemLoader("templates"),
-)
-jenv.filters['quintify'] = quintify
 
-quint_template = jenv.get_template('trace.qnt')
+# Generate a Quint file that contains the log of states,
+# along with an invariant that checks that the log is unreachable.
+def gen_trace(args):
+    states = load_values(args.state_file)
+    code = '''// This Quint module was generated. Do NOT edit manually.
+module {name} {{
+  import bank.* from "./bank"
 
-print(quint_template.render(trace=data))
+  // Generated trace from an actual execution in the Rust implementation
+  val observed_trace: List[BankState] =
+    {trace}
+
+  // Invariant stating that such a trace cannot be observed.
+  // This invariant should NOT hold: we expect the model-checker to exhibit
+  // a sequence of states matching the original trace.
+  val unreachableTrace = log != observed_trace
+}}'''.format(
+        name= 'trace',
+        trace= quintify(states)
+    )
+    print(code)
+
+# Generate a Quint file that defines a run with all the expected transitions.
+# We expect all intermediate states to match.
+def gen_run(args):
+    states  = load_values(args.state_file)
+    actions = load_values(args.action_file)
+
+    code = '''// This Quint module was generated. Do NOT edit manually.
+module {name} {{
+  import bank.* from "./bank"
+
+  // Generated run from an actual execution in the Rust implementation
+  run observed_trace: bool =
+    init{trace}
+
+}}'''.format(
+        name= 'trace',
+        trace= "\n      ".join(map(quintify, actions))
+    )
+    print(code)
+
+# CLI parsing
+
+def main():
+    parser = argparse.ArgumentParser(
+      description='''Quint generator for converting Rust traces
+                     into Quint executions''')
+
+    subparsers = parser.add_subparsers(
+      title='subcommands',
+      description='generation targets',
+      required=True)
+
+    trace_parser = subparsers.add_parser('trace')
+    trace_parser.add_argument("state_file",  help="log file for state trace")
+    trace_parser.set_defaults(func=gen_trace)
+
+    run_parser = subparsers.add_parser('run')
+    run_parser.add_argument("state_file",  help="log file for state trace")
+    run_parser.add_argument("action_file", help="log file for action trace")
+    run_parser.set_defaults(func=gen_run)
+
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == '__main__':
+    main()
