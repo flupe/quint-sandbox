@@ -27,6 +27,14 @@ def to_quint_action(a):
     else:
         return a
 
+# Pretty-print an ITF encoded action into the corresponding Quint action call
+def to_quint_action_call(action):
+    params = map(quintify, action._asdict().values())
+    return '{act}({params})'.format(
+        act    = action_lookup[type(action).__name__],
+        params = ", ".join(params)
+            )
+
 # Pretty-print a Python ITF value into a Quint expression
 def quintify(value):
     # simple dicts become Quint Maps
@@ -85,6 +93,15 @@ def gen_run(args):
     states  = load_values(args.state_file)
     actions = load_values(args.action_file)
 
+    # TODO: sanity checks that there are enough actions?
+
+    trace = ""
+
+    for action, state in zip(actions, states[1:]):
+        trace += "\n      .then({action})\n      .expect(bank_state == {st})".format(
+                   action = to_quint_action_call(action),
+                   st     = quintify(state))
+
     code = '''// This Quint module was generated. Do NOT edit manually.
 module {name} {{
   import bank.* from "./bank"
@@ -94,8 +111,8 @@ module {name} {{
     init{trace}
 
 }}'''.format(
-        name= 'trace',
-        trace= "\n      ".join(map(quintify, actions))
+        name= 'sequence',
+        trace= trace
     )
     print(code)
 
