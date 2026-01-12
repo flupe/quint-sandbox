@@ -15,6 +15,9 @@ module bank {
   var log: List[BankState]
   var error: Option[str]
 
+  // forced prefix of actions to take
+  var forced: List[Action]
+
   pure def increaseBalance(bs: str -> int, key: str, amount: int): str -> int =
     if (bs.keys().contains(key)) {
       bs.setBy(key, current => current + amount)
@@ -124,6 +127,14 @@ module bank {
       }
   }
 
+  // Reified actions
+  type Action
+    = Deposit({ depositor: str, amount: int })
+    | Withdraw({ withdrawer: str, amount: int })
+    | Transfer({ sender: str, receiver: str, amount: int })
+    | BuyInvestment({ buyer: str, amount: int })
+    | SellInvestment({ seller: str, investment_id: int })
+
   action deposit_act(depositor: str, amount: int): bool =
     assign_result(bank_state.deposit(depositor, amount))
   action withdraw_act(withdrawer: str, amount: int): bool =
@@ -167,25 +178,47 @@ module bank {
     sell_investment_act(seller, id)
   }
 
-  action init = {
+  action initWithForced(actions: List[Action]): bool = {
     val initState = {
-      // balances: ACCOUNTS.mapBy(acc => 0),
       balances: Map(),
       investments: Map(),
       next_id: 0,
     }
     all {
       bank_state' = initState,
-      error' = None,
-      log' = [initState],
+      error'      = None,
+      log'        = [initState],
+      forced'     = actions,
     }
   }
 
-  action step = any {
-    deposit_action,
-    withdraw_action,
-    transfer_action,
-    buy_investment_action,
-    sell_investment_action,
+  action init = initWithForced([])
+
+  action force_step(act: Action): bool = {
+    match act {
+      | Deposit(p)        => deposit_act(p.depositor,  p.amount)
+      | Withdraw(p)       => withdraw_act(p.withdrawer, p.amount)
+      | Transfer(p)       => transfer_act(p.sender, p.receiver, p.amount)
+      | BuyInvestment(p)  => buy_investment_act(p.buyer, p.amount)
+      | SellInvestment(p) => sell_investment_act(p.seller, p.investment_id)
+    }
   }
+
+  action step =
+    if (forced.length() > 0) all {
+      force_step(forced.head()),
+      forced' = forced.tail(),
+    } 
+
+    else all {
+      forced' = forced,
+
+      any {
+        deposit_action,
+        withdraw_action,
+        transfer_action,
+        buy_investment_action,
+        sell_investment_action,
+      }
+    }
 }

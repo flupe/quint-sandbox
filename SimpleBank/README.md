@@ -46,5 +46,10 @@ Conformance testing is carried out in two ways:
     finds a counter-example: all good! This means there exists a model execution
     that exhibits exactly what was observed in the real system.
 
-  - 
+  - Using [Quint *runs*][runs].
+
+  - Using transition replay. We adapt the Quint model so that the system state holds
+    a list of forced transitions that should happen before random exploration.
+
+[runs]: https://quint-lang.org/docs/lang#runs
 

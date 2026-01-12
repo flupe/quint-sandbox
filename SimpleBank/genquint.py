@@ -8,6 +8,7 @@ import argparse
 from collections import namedtuple
 from itf_py      import value_from_json
 
+# Lookup table for matching action constructors with their respective Quint action names.
 action_lookup = {
   'Deposit':        'deposit_act',
   'Transfer':       'transfer_act',
@@ -16,24 +17,17 @@ action_lookup = {
   'SellInvestment': 'sell_investment_act',
 }
 
-# Load a log file, parsing every line as an ITF-encoded value
-def load_values(src):
-    with open(src) as f:
-        return [value_from_json(json.loads(line)) for line in f]
-
-def to_quint_action(a):
-    if a in action_lookup.keys():
-        return action_lookup[a]
-    else:
-        return a
-
 # Pretty-print an ITF encoded action into the corresponding Quint action call
 def to_quint_action_call(action):
     params = map(quintify, action._asdict().values())
     return '{act}({params})'.format(
         act    = action_lookup[type(action).__name__],
-        params = ", ".join(params)
-            )
+        params = ", ".join(params))
+
+# Load a log file, parsing every line as an ITF-encoded value
+def load_values(src):
+    with open(src) as f:
+        return [value_from_json(json.loads(line)) for line in f]
 
 # Pretty-print a Python ITF value into a Quint expression
 def quintify(value):
@@ -41,6 +35,7 @@ def quintify(value):
     if isinstance(value, dict):
         items = ['{} -> {}'.format(quintify(k), quintify(v)) for k, v in value.items()]
         return 'Map({})'.format(', '.join(items))
+
     # strings have to use double quotes
     elif isinstance(value, str):
         res = repr(value)
@@ -48,19 +43,31 @@ def quintify(value):
             inner = res[1:-1].replace('"', '\\"').replace("\\'", "'")
             return '"{}"'.format(inner)
         return res
+
     # booleans are lowercase
     elif isinstance(value, bool):
         return str(value).lower()
+
     # lists syntax is identical
     elif isinstance(value, list):
         items = map(quintify, value)
         return "[{}]".format(", ".join(items))
+
     # named tuples become Quint records
     elif isinstance(value, tuple) and hasattr(value, "_fields"):
-        # TODO: possibly handle _itf_variant
         fields = value._asdict()
         items = ['{}: {}'.format(k, quintify(v)) for k, v in fields.items()]
-        return '{{{}}}'.format(', '.join(items))
+        args = '{{{}}}'.format(', '.join(items))
+
+        # if the value is a variant, put the variant name
+        if hasattr(value, '_itf_variant') and value._itf_variant:
+            return '{}({})'.format(type(value).__name__, args)
+
+        # otherwise, it's just a record
+        else:
+            return args
+
+    # for everything else, just use Python repr pretty-printing (e.g int)
     else:
         return repr(value)
 
@@ -111,13 +118,40 @@ module {name} {{
     init{trace}
 
 }}'''.format(
-        name= 'sequence',
-        trace= trace
-    )
+        name  = 'sequence',
+        trace = trace)
+
     print(code)
 
-# CLI parsing
+# Generate a Quint file that produces the list of reified transitions.
+# Also produce a run that calls `next` repeatedly, and checks for final state compliance.
+def gen_replay(args):
+    states  = load_values(args.state_file)
+    actions = load_values(args.action_file)
 
+    code = '''// This Quint module was generated. Do NOT edit manually.
+module {name} {{
+  import bank.* from "./bank"
+
+  // Sequence of actions extracted from a real execution
+  val actions: List[Action] =
+    {actions}
+
+  run checkTrace: bool =
+    initWithForced(actions)
+      .then({steps}.reps(_ => step))
+      .expect(bank_state == {final_state})
+
+}}'''.format(
+        name        = 'replay',
+        actions     = quintify(actions),
+        steps       = len(actions),
+        final_state = quintify(states[-1]))
+
+    print(code)
+
+
+# CLI parsing
 def main():
     parser = argparse.ArgumentParser(
       description='''Quint generator for converting Rust traces
@@ -136,6 +170,11 @@ def main():
     run_parser.add_argument("state_file",  help="log file for state trace")
     run_parser.add_argument("action_file", help="log file for action trace")
     run_parser.set_defaults(func=gen_run)
+
+    replay_parser = subparsers.add_parser('replay')
+    replay_parser.add_argument("state_file",  help="log file for state trace")
+    replay_parser.add_argument("action_file", help="log file for action trace")
+    replay_parser.set_defaults(func=gen_replay)
 
     args = parser.parse_args()
     args.func(args)
