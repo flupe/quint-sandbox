@@ -1,3 +1,5 @@
+# Quint Conformance Testing Example
+
 This folder contains an example of conformance testing using Quint.
 
 We have the following two components:
@@ -52,4 +54,48 @@ Conformance testing is carried out in two ways:
     a list of forced transitions that should happen before random exploration.
 
 [runs]: https://quint-lang.org/docs/lang#runs
+
+## Building the project
+
+### Rust setup
+
+Ensure you're using Nightly Rust.
+
+```bash
+rustup toolchain install nightly
+rustup default nightly
+```
+
+The project should compile with `cargo build`.
+
+### Python setup
+
+1. Ensure you have [Python][python] and [pip][pip] up and running
+2. Setup a virtual environment
+3. Install the dependencies locally ([`itf-py`][itf-py])
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+[python]: https://www.python.org/
+[pip]: https://pip.pypa.io/en/stable/
+[itf-py]: https://github.com/konnov/itf-py
+
+Then the Quint code generator is ready to be used! Simply type `./genquint.py` 
+with the appropriate arguments.
+
+## Running conformance tests
+
+### Model-Based Testing
+
+Running `./test.sh` will run simulations using the Quint model, and export the
+generated traces in the `traces/` folder. This same script will immediately call
+`cargo test` to check that all these traces execute fine on the Rust
+implementation and states match.
+
+### Conformance completeness (Rust -> Quint)
+
 

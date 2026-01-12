@@ -18,6 +18,7 @@ action_lookup = {
 }
 
 # Pretty-print an ITF encoded action into the corresponding Quint action call
+# e.g Deposit(depositor = "bob", amount = 15) will become 'deposit_act("bob", 15)'
 def to_quint_action_call(action):
     params = map(quintify, action._asdict().values())
     return '{act}({params})'.format(

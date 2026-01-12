@@ -1,0 +1,2 @@
+frozendict==2.4.7
+itf-py==0.4.3
