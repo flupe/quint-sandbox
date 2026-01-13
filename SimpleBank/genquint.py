@@ -106,7 +106,7 @@ def gen_run(args):
     trace = ""
 
     for action, state in zip(actions, states[1:]):
-        trace += "\n      .then({action})\n      .expect(bank_state == {st})".format(
+        trace += "\n      .then(enforced({action}))\n      .expect(bank_state == {st})".format(
                    action = to_quint_action_call(action),
                    st     = quintify(state))
 

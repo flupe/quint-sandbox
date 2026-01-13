@@ -146,6 +146,11 @@ module bank {
   action sell_investment_act(seller: str, id: int): bool =
     assign_result(bank_state.sell_investment(seller, id))
 
+  action enforced (test: bool): bool = all {
+    test,
+    forced' = forced,
+  }
+
   // TODO: cleanup step function and non-det picks
   action deposit_action = {
     nondet amount    = AMOUNTS.oneOf()
