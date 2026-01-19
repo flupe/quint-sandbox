@@ -174,11 +174,11 @@ genquint.py: error: the following arguments are required: {trace,run,replay}
    // This Quint module was generated. Do NOT edit manually.
    module trace {
      import bank.* from "./bank"
-   
+
      // Generated trace from an actual execution in the Rust implementation
      val observed_trace: List[BankState] =
        [{balances: Map(), investments: Map(), next_id: 0}, {balances: Map("bob" -> 20), investments: Map(), next_id: 0}, {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 0}, {balances: Map("alice" -> 10, "bob" -> 0), investments: Map(0 -> {owner: "bob", amount: 10}), next_id: 1}, {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 1}]
-   
+
      // Invariant stating that such a trace cannot be observed.
      // This invariant should NOT hold: we expect the model-checker to exhibit
      // a sequence of states matching the original trace.
@@ -210,7 +210,7 @@ genquint.py: error: the following arguments are required: {trace,run,replay}
   // This Quint module was generated. Do NOT edit manually.
   module sequence {
     import bank.* from "./bank"
-  
+
     // Generated run from an actual execution in the Rust implementation
     run observed_trace: bool =
       init
@@ -257,16 +257,16 @@ genquint.py: error: the following arguments are required: {trace,run,replay}
    // This Quint module was generated. Do NOT edit manually.
    module replay {
      import bank.* from "./bank"
-   
+
      // Sequence of actions extracted from a real execution
      val actions: List[Action] =
        [Deposit({depositor: "bob", amount: 20}), Transfer({sender: "bob", receiver: "alice", amount: 10}), BuyInvestment({buyer: "bob", amount: 10}), SellInvestment({seller: "bob", investment_id: 0})]
-   
+
      run checkTrace: bool =
        initWithForced(actions)
          .then(4.reps(_ => step))
          .expect(bank_state == {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 1})
-   
+
    }
    ```
 
@@ -280,3 +280,45 @@ genquint.py: error: the following arguments are required: {trace,run,replay}
 
      1 passing (12ms)
    ```
+
+   In the generated module, we see that the model is initialized with the list of forced actions.
+   Then, the generated run takes as many steps as there are actions in the trace.
+   We check that the final state matches the one we observed in the real execution.
+
+---
+
+### A few notes
+
+This example was constructed to demonstrate how one would bridge the gap between
+a Quint model and its corresponding Rust implementation, in both directions.
+
+Obivously, this would have to be adapted for every model/implementation.
+In particular, the Quint code generation script is not generic in any sensible
+way, and has to be adapted to the model at hand.
+
+However, we made sure to reuse existing code from external
+libraries to ease the implementation. This comment pertains specifically to
+serialization/deserialization.
+
+Traces produced by Quint are serialized in the [Apalache ITF JSON format][itf].
+Those traces can then be deserialized in the Rust side using [itf-rs][itf-rs],
+into user-defined states, thanks to Serde's generic deriving helpers and the
+library deserialization helpers.
+
+Going the other direction is a bit more tedious, because the itf-rs library
+does not provide serialization helpers.
+If we try going to JSON directly, some unexpected issues may arise using the
+default JSON serializer: JSON does not support `HashMap` with
+non-string keys, the JSON encoding of `BigInt` leaks the internal
+representation, etc.
+
+That's why we made sure to use custom serialization helpers (see `src/helpers.rs`),
+so that the JSON obtained when serializing states and actions abides by the ITF
+format. See in `src/action.rs` how the helpers are used.
+
+Then, we can directly import it in Python using the [itf-py][itf-py] library,
+with no extra processing required.
+
+[itf]: https://apalache-mc.org/docs/adr/015adr-trace.html
+[itf-rs]: https://github.com/informalsystems/itf-rs/
+[itf-py]: https://github.com/konnov/itf-py
