@@ -98,4 +98,43 @@ implementation and states match.
 
 ### Conformance completeness (Rust -> Quint)
 
+When going the other direction, the purpose is to extract traces of interest observed in the real system
+and import them. There are many valid ways to generate traces: from a pool of existing recorded scenarii, from randomly generated traces (e.g. from a property-based testing infrastructure), or from live monitoring.
+
+In this demo, we decided to produce logs from an interactive session with the Rust aplication.
+
+```bash
+cargo run -- --help
+```
+
+```
+Usage: simple_bank [OPTIONS]
+
+Options:
+  -s, --state-log-file <STATE_LOG_FILE>    Log file to dump the state trace
+  -a, --action-log-file <ACTION_LOG_FILE>  Log file to dump the state AND action trace
+  -h, --help                               Print help
+  -V, --version                            Print version
+```
+
+Two kinds of log files can be produced:
+- `-s`: one containing a trace of all the intermediate states of the application.
+
+   ```
+   {"balances":{"#map":[]},"investments":{"#map":[]},"next_id":{"#bigint":"0"}}
+   {"balances":{"#map":[["bob",{"#bigint":"20"}]]},"investments":{"#map":[]},"next_id":{"#bigint":"0"}}
+   {"balances":{"#map":[["alice",{"#bigint":"10"}],["bob",{"#bigint":"10"}]]},"investments":{"#map":[]},"next_id":{"#bigint":"0"}}
+   {"balances":{"#map":[["alice",{"#bigint":"10"}],["bob",{"#bigint":"0"}]]},"investments":{"#map":[[{"#bigint":"0"},{"owner":"bob","amount":{"#bigint":"10"}}]]},"next_id":{"#bigint":"1"}}
+   {"balances":{"#map":[["alice",{"#bigint":"10"}],["bob",{"#bigint":"10"}]]},"investments":{"#map":[]},"next_id":{"#bigint":"1"}}
+   ```
+- `-a`: one containing the trace of all actions that have been observed.
+
+   ```
+   {"tag":"Deposit","value":{"depositor":"bob","amount":{"#bigint":"20"}}}
+   {"tag":"Transfer","value":{"sender":"bob","receiver":"alice","amount":{"#bigint":"10"}}}
+   {"tag":"BuyInvestment","value":{"buyer":"bob","amount":{"#bigint":"10"}}}
+   {"tag":"SellInvestment","value":{"seller":"bob","investment_id":{"#bigint":"0"}}}
+   ```
+
+
 
