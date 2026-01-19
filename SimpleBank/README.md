@@ -292,7 +292,7 @@ genquint.py: error: the following arguments are required: {trace,run,replay}
 This example was constructed to demonstrate how one would bridge the gap between
 a Quint model and its corresponding Rust implementation, in both directions.
 
-Obivously, this would have to be adapted for every model/implementation.
+Obviously, this would have to be adapted for every model/implementation.
 In particular, the Quint code generation script is not generic in any sensible
 way, and has to be adapted to the model at hand.
 
