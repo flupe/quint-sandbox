@@ -89,7 +89,7 @@ with the appropriate arguments.
 
 ## Running conformance tests
 
-### Model-Based Testing
+### Model-Based Testing (Quint -> Rust)
 
 Running `./test.sh` will run simulations using the Quint model, and export the
 generated traces in the `traces/` folder. This same script will immediately call
@@ -97,6 +97,8 @@ generated traces in the `traces/` folder. This same script will immediately call
 implementation and states match.
 
 ### Conformance completeness (Rust -> Quint)
+
+#### Extracting traces from the real system
 
 When going the other direction, the purpose is to extract traces of interest observed in the real system
 and import them. There are many valid ways to generate traces: from a pool of existing recorded scenarii, from randomly generated traces (e.g. from a property-based testing infrastructure), or from live monitoring.
@@ -136,5 +138,145 @@ Two kinds of log files can be produced:
    {"tag":"SellInvestment","value":{"seller":"bob","investment_id":{"#bigint":"0"}}}
    ```
 
+In the following, we expect logs to have been generated under the following names:
+
+```bash
+cargo run -- -s log -a act
+```
+
+#### Importing them in Quint
+
+The `genquint.py` script generates Quint modules on demand, from extracted traces.
+We showcase 3 flavors of generated modules.
+
+```bash
+./genquint.py --help
+```
+
+```
+usage: genquint.py [-h] {trace,run,replay} ...
+genquint.py: error: the following arguments are required: {trace,run,replay}
+```
+
+1. Trace generation.
+
+   The model is modified to store a log of all its intermediate states (See `bank.qnt:log`).
+   We generate a module that contains the Quint equivalent of the recorded trace.
+   This module also contains an invariant stating that the trace should not be reachable.
+   We expect the model-checker to find a counterexample for this invariant, proving that this trace 
+   is possible in our model.
+
+   ```bash
+   ./genquint.py trace log > trace.qnt
+   ```
+
+   ```quint
+   // This Quint module was generated. Do NOT edit manually.
+   module trace {
+     import bank.* from "./bank"
+   
+     // Generated trace from an actual execution in the Rust implementation
+     val observed_trace: List[BankState] =
+       [{balances: Map(), investments: Map(), next_id: 0}, {balances: Map("bob" -> 20), investments: Map(), next_id: 0}, {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 0}, {balances: Map("alice" -> 10, "bob" -> 0), investments: Map(0 -> {owner: "bob", amount: 10}), next_id: 1}, {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 1}]
+   
+     // Invariant stating that such a trace cannot be observed.
+     // This invariant should NOT hold: we expect the model-checker to exhibit
+     // a sequence of states matching the original trace.
+     val unreachableTrace = log != observed_trace
+   }
+   ```
+
+   ```bash
+   quint verify trace.qnt --invariant unreachableTrace
+   ```
+
+   ```
+   [violation] Found an issue (6092ms).
+   error: found a counterexample
+   ```
+
+   Note that this kind of generated module is only suitable for short traces.
+   The state space grows exponentially as the trace length increases.
+
+2. Run generation.
+
+   We alternatively generate proper Quint *runs*.
+
+   ```bash
+   ./genquint.py run log act > sequence.qnt
+   ```
+
+   ```quint
+  // This Quint module was generated. Do NOT edit manually.
+  module sequence {
+    import bank.* from "./bank"
+  
+    // Generated run from an actual execution in the Rust implementation
+    run observed_trace: bool =
+      init
+        .then(enforced(deposit_act("bob", 20)))
+        .expect(bank_state == {balances: Map("bob" -> 20), investments: Map(), next_id: 0})
+        .then(enforced(transfer_act("bob", "alice", 10)))
+        .expect(bank_state == {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 0})
+        .then(enforced(buy_investment_act("bob", 10)))
+        .expect(bank_state == {balances: Map("alice" -> 10, "bob" -> 0), investments: Map(0 -> {owner: "bob", amount: 10}), next_id: 1})
+        .then(enforced(sell_investment_act("bob", 0)))
+        .expect(bank_state == {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 1})
+  }
+   ```
+
+   ```bash
+   quint test sequence.qnt --match=observed_trace
+   ```
+
+   ```
+   sequence
+       ok observed_trace passed 1 test(s)
+
+     1 passing (11ms)
+   ```
+
+   The generation script converts actions parsed in the log into their Quint equivalent defined
+   in the model. See the top of the Python file to find/edit the lookup table.
+
+3. Replay.
+
+   It is not uncommon for Quint models to have in the state a list of (reified) actions
+   that have to be taken first before random steps take over.
+
+   In the model, this is the role of the `replay` variable.
+   In the `step` function, unless this list is empty, we take the next forced action and apply it.
+   Otherwise, we take a random action.
 
 
+   ```bash
+   ./genquint.py replay log act > replay.qnt
+   ```
+
+   ```quint
+   // This Quint module was generated. Do NOT edit manually.
+   module replay {
+     import bank.* from "./bank"
+   
+     // Sequence of actions extracted from a real execution
+     val actions: List[Action] =
+       [Deposit({depositor: "bob", amount: 20}), Transfer({sender: "bob", receiver: "alice", amount: 10}), BuyInvestment({buyer: "bob", amount: 10}), SellInvestment({seller: "bob", investment_id: 0})]
+   
+     run checkTrace: bool =
+       initWithForced(actions)
+         .then(4.reps(_ => step))
+         .expect(bank_state == {balances: Map("alice" -> 10, "bob" -> 10), investments: Map(), next_id: 1})
+   
+   }
+   ```
+
+   ```bash
+   quint test replay.qnt --match=checkTrace
+   ```
+
+   ```
+   replay
+       ok checkTrace passed 1 test(s)
+
+     1 passing (12ms)
+   ```
